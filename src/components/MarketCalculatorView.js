@@ -102,14 +102,16 @@ export function createMarketCalculatorView(container, state, onAddToCart) {
     const bestOp = affordableOps.length > 0 ? affordableOps[0] : null;
 
     // Calcular Carteira Mista / Diversificada (Cesta de Itens)
-    // Distribui o capital em até 3 itens lucrativos distintos para não saturar o Black Market
+    // Distribui o capital em múltiplos itens meta distintos (1 a 2 unidades cada), igual nos vídeos de transporte
     const basketCandidates = [];
     const seenBases = new Set();
+    const maxBasketPrice = state.budget <= 150_000 ? state.budget : Math.max(35_000, state.budget * 0.12);
+
     for (const op of affordableOps) {
-      if (!seenBases.has(op.baseId)) {
+      if (op.buyPrice <= maxBasketPrice && !seenBases.has(op.baseId)) {
         seenBases.add(op.baseId);
         basketCandidates.push(op);
-        if (basketCandidates.length >= 3) break;
+        if (basketCandidates.length >= 12) break;
       }
     }
     if (basketCandidates.length === 0 && affordableOps.length > 0) {
@@ -122,32 +124,51 @@ export function createMarketCalculatorView(container, state, onAddToCart) {
     let basketTotalNetReturn = 0;
     let basketTotalNetProfit = 0;
     let basketTotalWeightKg = 0;
+    let remainingBasketBudget = state.budget;
 
-    if (basketCandidates.length > 0) {
-      const budgetPerItem = Math.floor(state.budget / basketCandidates.length);
-      for (const item of basketCandidates) {
-        const units = Math.floor(budgetPerItem / item.buyPrice);
-        if (units > 0) {
-          const inv = units * item.buyPrice;
-          const grossRet = units * item.sellPrice;
-          const netRet = units * item.netSellPrice;
-          const netProf = netRet - inv;
-          const weight = units * (item.unitWeight || 2.0);
-          basketItems.push({
-            ...item,
-            allocatedUnits: units,
-            allocatedInvestment: inv,
-            allocatedGrossReturn: grossRet,
-            allocatedNetReturn: netRet,
-            allocatedNetProfit: netProf,
-            allocatedWeightKg: weight
-          });
-          basketTotalInvestment += inv;
-          basketTotalGrossReturn += grossRet;
-          basketTotalNetReturn += netRet;
-          basketTotalNetProfit += netProf;
-          basketTotalWeightKg += weight;
-        }
+    // Alocar 1 unidade de cada candidato primeiro (máxima variedade)
+    for (const item of basketCandidates) {
+      if (remainingBasketBudget < item.buyPrice) continue;
+      const units = 1;
+      const inv = units * item.buyPrice;
+      const grossRet = units * item.sellPrice;
+      const netRet = units * item.netSellPrice;
+      const netProf = netRet - inv;
+      const weight = units * (item.unitWeight || 2.0);
+
+      basketItems.push({
+        ...item,
+        allocatedUnits: units,
+        allocatedInvestment: inv,
+        allocatedGrossReturn: grossRet,
+        allocatedNetReturn: netRet,
+        allocatedNetProfit: netProf,
+        allocatedWeightKg: weight
+      });
+      remainingBasketBudget -= inv;
+      basketTotalInvestment += inv;
+      basketTotalGrossReturn += grossRet;
+      basketTotalNetReturn += netRet;
+      basketTotalNetProfit += netProf;
+      basketTotalWeightKg += weight;
+    }
+
+    // Se sobrar saldo, adicionar 2ª unidade (máx 2x por item para manter alta variedade)
+    for (const bItem of basketItems) {
+      if (remainingBasketBudget >= bItem.buyPrice && bItem.allocatedUnits < 2) {
+        bItem.allocatedUnits += 1;
+        bItem.allocatedInvestment += bItem.buyPrice;
+        bItem.allocatedGrossReturn += bItem.sellPrice;
+        bItem.allocatedNetReturn += bItem.netSellPrice;
+        bItem.allocatedNetProfit += bItem.unitProfit;
+        bItem.allocatedWeightKg += (bItem.unitWeight || 2.0);
+
+        remainingBasketBudget -= bItem.buyPrice;
+        basketTotalInvestment += bItem.buyPrice;
+        basketTotalGrossReturn += bItem.sellPrice;
+        basketTotalNetReturn += bItem.netSellPrice;
+        basketTotalNetProfit += bItem.unitProfit;
+        basketTotalWeightKg += (bItem.unitWeight || 2.0);
       }
     }
 

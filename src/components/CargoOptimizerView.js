@@ -1,7 +1,7 @@
 // Componente da Aba: Estimativa & Otimizador de Carga por Bolsa e Montaria
-// Calcula a combinação exata de itens e quantidades para o maior lucro líquido possível
-// respeitando estritamente o orçamento e o peso máximo (Montaria + Bolsa)
-// Inclui suporte a itens de coleta, recursos refinados, consumíveis e sugestões de alta demanda
+// Baseado na estratégia real de vídeos e guias de transporte do Albion Online:
+// "Diversificação Extrema: 1 a 2 unidades de dezenas de itens diferentes de alta demanda"
+// Evita saturação das ordens de compra do Black Market e maximiza o lucro real no bolso.
 
 import { 
   getExpandedItemIdsList, 
@@ -20,8 +20,9 @@ export function createCargoOptimizerView(container, state, onAddToCart) {
   let isLoading = false;
   let selectedMountId = state.selectedMountId || 'armored_horse_t5';
   let selectedBagId = state.selectedBagId || 'bag_t5';
-  let optimizationStrategy = 'fast_sale'; // 'fast_sale' (default) | 'balanced' | 'max_profit' | 'high_mobility'
+  let optimizationStrategy = 'fast_sale'; // 'fast_sale' (default) | 'max_diversity' | 'balanced' | 'max_profit' | 'high_mobility'
   let selectedCategory = 'all';
+  let maxUnitsPerItem = 2; // Padrão dos vídeos de transporte: 1x a 2x por item
   let onlyHighDemand = false;
 
   async function loadData(forceRefresh = false) {
@@ -57,13 +58,14 @@ export function createCargoOptimizerView(container, state, onAddToCart) {
       maxDataAgeHours: 72
     });
 
-    // 2. Executar o motor de otimização de carga com as restrições de montaria e bolsa
+    // 2. Executar o motor de otimização de carga com as restrições de montaria, bolsa e alta variedade
     const plan = optimizeCargoLoadout(opportunities, {
       budget: state.budget,
       mountId: selectedMountId,
       bagId: selectedBagId,
       safetyMarginPercent: 0.05,
-      maxItemDiversity: 8,
+      maxItemDiversity: 35,
+      maxUnitsPerItem: maxUnitsPerItem,
       strategy: optimizationStrategy,
       onlyHighDemand: onlyHighDemand
     });
@@ -80,7 +82,7 @@ export function createCargoOptimizerView(container, state, onAddToCart) {
                 Estimativa de Lucro Máximo por Equipamento
               </h2>
               <p class="panel-sub">
-                Informe quanto deseja investir, sua montaria e bolsa. O algoritmo calcula a combinação perfeita de itens e quantidades para o maior retorno líquido sem risco de sobrecarga.
+                Inspirado no método real dos melhores vídeos de transporte de Albion: <strong>alta variedade de itens com poucas unidades de cada (1x a 2x)</strong> para não derrubar as ordens de compra do Black Market e garantir venda rápida ao chegar em Caerleon.
               </p>
             </div>
 
@@ -143,16 +145,35 @@ export function createCargoOptimizerView(container, state, onAddToCart) {
               <label class="control-label" for="opt-select-strategy">Estratégia de Carga:</label>
               <select id="opt-select-strategy" class="select-field">
                 <option value="fast_sale" ${optimizationStrategy === 'fast_sale' ? 'selected' : ''}>
-                  ⚡ Giro Rápido & Alta Demanda (Itens mais fáceis de vender)
+                  ⚡ Modo Transportador Pro (Alta Variedade & Giro Rápido)
+                </option>
+                <option value="max_diversity" ${optimizationStrategy === 'max_diversity' ? 'selected' : ''}>
+                  🎒 Diversificação Máxima (1 item de cada tipo do jogo)
                 </option>
                 <option value="balanced" ${optimizationStrategy === 'balanced' ? 'selected' : ''}>
-                  ⚖️ Equilibrada (Divide em até 8 itens para não saturar o BM)
+                  ⚖️ Equilibrada (Até 3x por item)
                 </option>
                 <option value="max_profit" ${optimizationStrategy === 'max_profit' ? 'selected' : ''}>
-                  💎 Lucro Máximo (Concentração nos maiores lucros)
+                  💎 Maior Retorno Absoluto (% ROI)
                 </option>
                 <option value="high_mobility" ${optimizationStrategy === 'high_mobility' ? 'selected' : ''}>
-                  🐎 Alta Mobilidade (Deixa 15% de folga de peso para emergências)
+                  🐎 Alta Mobilidade (15% folga de peso)
+                </option>
+              </select>
+
+              <label class="control-label mt-2" for="opt-select-units-cap">Unidades Máx. por Item:</label>
+              <select id="opt-select-units-cap" class="select-field">
+                <option value="2" ${maxUnitsPerItem === 2 ? 'selected' : ''}>
+                  🎒 1x a 2x por item (Recomendado • Padrão dos Vídeos)
+                </option>
+                <option value="1" ${maxUnitsPerItem === 1 ? 'selected' : ''}>
+                  🎯 Apenas 1x por item (Máxima Variedade de Mercado)
+                </option>
+                <option value="3" ${maxUnitsPerItem === 3 ? 'selected' : ''}>
+                  ⚖️ Até 3x por item (Equilibrado)
+                </option>
+                <option value="5" ${maxUnitsPerItem === 5 ? 'selected' : ''}>
+                  📦 Até 5x por item (Lotes Maiores)
                 </option>
               </select>
 
@@ -311,13 +332,31 @@ export function createCargoOptimizerView(container, state, onAddToCart) {
           </div>
         </div>
 
+        <!-- Banner Tático: Método de Alta Variedade dos Vídeos de Transporte -->
+        <div class="smuggler-strategy-banner">
+          <div class="banner-icon-box">
+            <span>🎬</span>
+          </div>
+          <div class="banner-content">
+            <div class="banner-badge-row">
+              <span class="badge-tag">MÉTODO DOS VÍDEOS DE TRANSPORTE</span>
+              <span class="variety-indicator-pill">🎒 <strong>${plan.distinctTypesCount}</strong> Tipos Distintos • <strong>${plan.itemsCount}</strong> Unidades Totais (Média: <strong>${plan.averageUnitsPerType}x</strong> por item)</span>
+              <span class="risk-indicator-pill">🛡️ Risco de Saturação: <strong>${plan.marketSaturationRisk}</strong></span>
+            </div>
+            <h4 class="banner-title">Estratégia de Alta Variedade & Giro Imediato no Black Market</h4>
+            <p class="banner-text">
+              No Albion Online, o Black Market funciona com ordens de compra automáticas que diminuem de preço após cada venda. Transporters veteranos nunca levam lotes grandes do mesmo item (ex: 10 espadas iguais) porque a partir da 2ª ou 3ª unidade a margem de lucro despenca. Esta lista espalha seu capital em <strong>1 a 2 unidades de dezenas de itens diferentes de alta demanda</strong>, garantindo venda imediata e lucro real máximo!
+            </p>
+          </div>
+        </div>
+
         <!-- Tabela da Carga Recomendada (Plano de Compra) -->
         <div class="table-container">
           <div class="table-sub-header">
             <h4 class="table-sub-title">
-              Itens Selecionados para Carga Máxima (${plan.distinctTypesCount} tipos • ${plan.itemsCount} unidades totais)
+              Itens Selecionados para Carga (${plan.distinctTypesCount} tipos diferentes • ${plan.itemsCount} unidades totais)
             </h4>
-            <span class="table-sub-desc">Compre exatamente estas quantidades em ${state.selectedCity} e viaje com o combo de segurança</span>
+            <span class="table-sub-desc">Compre de 1 a 2 unidades de cada item para vender imediatamente no Black Market sem derrubar as ordens de compra</span>
           </div>
 
           ${isLoading ? `
@@ -495,6 +534,15 @@ export function createCargoOptimizerView(container, state, onAddToCart) {
       });
     }
 
+    // Seletor de Unidades Máximas por Item (Padrão de Vídeos de Transporte)
+    const selectUnitsCap = document.getElementById('opt-select-units-cap');
+    if (selectUnitsCap) {
+      selectUnitsCap.addEventListener('change', (e) => {
+        maxUnitsPerItem = Number(e.target.value);
+        render();
+      });
+    }
+
     // Seletor de Categoria
     const selectCategory = document.getElementById('opt-select-category');
     if (selectCategory) {
@@ -557,7 +605,7 @@ export function createCargoOptimizerView(container, state, onAddToCart) {
           for (const item of plan.recommendedItems) {
             onAddToCart(item, item.recommendedUnits);
           }
-          showToast(`Carga Otimizada Carregada! ${plan.itemsCount} unidades adicionadas ao Carrinho.`);
+          showToast(`Carga Diversificada Carregada! ${plan.itemsCount} unidades (${plan.distinctTypesCount} tipos) adicionadas ao Carrinho.`);
         }
       });
     }
@@ -566,10 +614,12 @@ export function createCargoOptimizerView(container, state, onAddToCart) {
     const btnCopyChecklist = document.getElementById('btn-copy-optimized-checklist');
     if (btnCopyChecklist && plan && plan.recommendedItems.length > 0) {
       btnCopyChecklist.addEventListener('click', () => {
-        let text = `📦 LISTA DE CARGA OTIMIZADA (Lymhurst -> Caerleon)\n`;
+        let text = `📦 LISTA DE CARGA DIVERSIFICADA (Lymhurst -> Caerleon)\n`;
+        text += `🎒 Variedade: ${plan.distinctTypesCount} tipos de itens (${plan.itemsCount} unidades totais • média ${plan.averageUnitsPerType}x/item)\n`;
         text += `⚔️ Saldo Investido: ${formatSilver(plan.totalInvested)} / ${formatSilver(plan.budget)}\n`;
         text += `💰 Lucro Líquido Estimado: +${formatSilver(plan.totalNetProfit)} (+${plan.averageRoiPercent.toFixed(1)}% ROI)\n`;
         text += `⚖️ Peso da Carga: ${plan.totalWeightUsed.toFixed(1)} kg / ${plan.totalMaxLoadKg} kg (${plan.mount.name.split(' (')[0]} + ${plan.bag.name})\n`;
+        text += `🛡️ Risco de Saturação: ${plan.marketSaturationRisk}\n`;
         text += `--------------------------------------------------\n`;
 
         plan.recommendedItems.forEach((item, i) => {
@@ -578,7 +628,7 @@ export function createCargoOptimizerView(container, state, onAddToCart) {
         });
 
         navigator.clipboard.writeText(text).then(() => {
-          showToast('Lista de compras completa copiada para a área de transferência!');
+          showToast('Lista de compras diversificada copiada para a área de transferência!');
         });
       });
     }
