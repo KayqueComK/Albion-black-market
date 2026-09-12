@@ -1384,13 +1384,21 @@ svg.icon-inline {
    ESTADOS DE LOADING E VAZIO
    ========================================================================== */
 .loading-state, .empty-state, .cart-empty-box {
-  padding: 60px 20px;
+  padding: 48px 20px;
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px dashed var(--border-card);
+  border-radius: var(--radius-md);
+  margin: 16px 0;
+}
+
+.empty-state svg, .cart-empty-box svg {
+  display: none !important;
 }
 
 .loading-state h3, .empty-state h3, .cart-empty-box h4 {
