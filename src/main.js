@@ -3,6 +3,7 @@
 import { SERVERS } from './services/albionApi.js';
 import { createBanditView } from './components/BanditView.js';
 import { createMarketCalculatorView } from './components/MarketCalculatorView.js';
+import { createCargoOptimizerView } from './components/CargoOptimizerView.js';
 import { createCartLoadoutView } from './components/CartLoadoutView.js';
 import { createDataClientGuideView } from './components/DataClientGuideView.js';
 
@@ -14,6 +15,7 @@ const appState = {
   hasPremium: true,           // Status premium
   sellMode: 'instant',        // Venda imediata
   selectedMountId: 'armored_horse_t5',
+  selectedBagId: 'bag_t5',
   cart: [],                   // Itens selecionados para transporte
   currentTab: 'bandit'
 };
@@ -111,6 +113,10 @@ function switchTab(tabId) {
     activeViewInstance = createBanditView(container, appState);
   } else if (tabId === 'calculator') {
     activeViewInstance = createMarketCalculatorView(container, appState, (opportunity, qty = 1) => {
+      handleAddToCart(opportunity, qty);
+    });
+  } else if (tabId === 'optimizer') {
+    activeViewInstance = createCargoOptimizerView(container, appState, (opportunity, qty = 1) => {
       handleAddToCart(opportunity, qty);
     });
   } else if (tabId === 'cart') {

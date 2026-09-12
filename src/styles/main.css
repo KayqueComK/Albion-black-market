@@ -2216,3 +2216,238 @@ svg.icon-inline {
   transform: translateY(0);
   opacity: 1;
 }
+
+/* ==========================================================================
+   ESTIMATIVA INTELIGENTE & OTIMIZADOR DE CARGA (BOLSA + MONTARIA)
+   ========================================================================== */
+.optimizer-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.optimizer-control-panel {
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: var(--shadow-md);
+}
+
+.optimizer-controls-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1.3fr 1.1fr;
+  gap: 20px;
+}
+
+@media (max-width: 1024px) {
+  .optimizer-controls-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Medidor Visual de Carga (Weight Gauge) */
+.weight-gauge-card {
+  background: linear-gradient(135deg, rgba(14, 20, 34, 0.95), rgba(20, 28, 48, 0.95));
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  box-shadow: var(--shadow-md);
+  position: relative;
+  overflow: hidden;
+}
+
+.weight-gauge-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.gauge-title-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gauge-badge {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-silver-muted);
+  letter-spacing: 0.5px;
+}
+
+.gauge-main-title {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  color: #ffffff;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gauge-sub-breakdown {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--color-silver-muted);
+  font-weight: 400;
+}
+
+.gauge-sub-breakdown strong {
+  color: var(--color-gold);
+}
+
+.gauge-status-badge {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  letter-spacing: 0.5px;
+}
+
+.status-safe {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.status-optimal {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--color-gold);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  box-shadow: 0 0 10px var(--color-gold-glow);
+}
+
+.status-danger {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  animation: pulse-danger 1.5s infinite;
+}
+
+.bar-optimal {
+  background: linear-gradient(90deg, #10b981, #f59e0b);
+}
+
+.weight-gauge-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--color-silver-muted);
+}
+
+.weight-gauge-meta strong {
+  color: #ffffff;
+}
+
+/* Painel de Resultados Hero */
+.optimizer-results-hero {
+  background: linear-gradient(135deg, rgba(14, 20, 34, 0.95), rgba(20, 28, 48, 0.95));
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 20px rgba(245, 158, 11, 0.08);
+}
+
+.results-hero-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 16px;
+  margin-bottom: 20px;
+}
+
+.results-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.results-main-title {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.results-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Tabela de Carga Recomendada */
+.table-sub-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.table-sub-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.table-sub-desc {
+  font-size: 0.8rem;
+  color: var(--color-silver-muted);
+  display: block;
+  margin-top: 2px;
+}
+
+.cell-qty-recommended {
+  white-space: nowrap;
+}
+
+.recommended-qty-pill {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--color-gold);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  padding: 4px 10px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+.recommended-qty-pill strong {
+  font-size: 1rem;
+  margin-right: 4px;
+  color: #ffffff;
+}
+
+.cell-weight-col {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+.weight-val {
+  color: #e2e8f0;
+  display: block;
+}
+
+.weight-sub {
+  font-size: 0.7rem;
+  color: #64748b;
+  display: block;
+}

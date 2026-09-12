@@ -98,13 +98,37 @@ export const QUALITIES = [
   { id: 5, name: 'Obra-Prima (Masterpiece)', color: '#f59e0b' }
 ];
 
+// Bolsas do Albion Online e seus bônus de capacidade de carga (kg)
+export const BAGS_CATALOG = [
+  { id: 'none', name: 'Sem Bolsa Adicional (Básico)', bonusKg: 0, tier: 0 },
+  { id: 'bag_t4', name: 'Bolsa do Adepto T4 (+180 kg)', bonusKg: 180, tier: 4 },
+  { id: 'bag_t4_1', name: 'Bolsa do Adepto T4.1 (+220 kg)', bonusKg: 220, tier: 4.1 },
+  { id: 'bag_t5', name: 'Bolsa do Perito T5 (+275 kg)', bonusKg: 275, tier: 5 },
+  { id: 'bag_t5_1', name: 'Bolsa do Perito T5.1 (+330 kg)', bonusKg: 330, tier: 5.1 },
+  { id: 'bag_t6', name: 'Bolsa do Mestre T6 (+410 kg)', bonusKg: 410, tier: 6 },
+  { id: 'bag_t6_1', name: 'Bolsa do Mestre T6.1 (+490 kg)', bonusKg: 490, tier: 6.1 },
+  { id: 'bag_t7', name: 'Bolsa do Grão-Mestre T7 (+600 kg)', bonusKg: 600, tier: 7 },
+  { id: 'bag_t7_1', name: 'Bolsa do Grão-Mestre T7.1 (+720 kg)', bonusKg: 720, tier: 7.1 },
+  { id: 'bag_t8', name: 'Bolsa do Ancião T8 (+880 kg)', bonusKg: 880, tier: 8 },
+  { id: 'bag_t8_1', name: 'Bolsa do Ancião T8.1 (+1.050 kg)', bonusKg: 1050, tier: 8.1 },
+  { id: 'bag_t8_3', name: 'Bolsa do Ancião T8.3 (+1.500 kg)', bonusKg: 1500, tier: 8.3 }
+];
+
 // Montarias comuns para transporte e suas capacidades de carga aproximadas (kg)
 export const TRANSPORT_MOUNTS = [
-  { id: 'armored_horse_t5', name: 'Cavalo Blindado T5', maxLoadKg: 450, speed: 'Alta', safety: 'Alta (Resistência a dano)', recommended: true },
-  { id: 'ox_t5', name: 'Boi de Transporte T5', maxLoadKg: 1600, speed: 'Lenta', safety: 'Média (Perigoso se descer do boi)', recommended: false },
-  { id: 'ox_t6', name: 'Boi de Transporte T6', maxLoadKg: 2400, speed: 'Lenta', safety: 'Média', recommended: false },
-  { id: 'grizzly_bear', name: 'Urso Cinzento T7 (Grizzly Bear)', maxLoadKg: 2100, speed: 'Média-Rápida', safety: 'Extrema (Habilidade Anti-Slow)', recommended: true },
-  { id: 'spectral_direboar', name: 'Javali Espectral T7', maxLoadKg: 1100, speed: 'Muito Alta', safety: 'Extrema (Invisibilidade ativa)', recommended: true }
+  { id: 'armored_horse_t5', name: 'Cavalo Blindado T5 (450 kg)', maxLoadKg: 450, speed: 'Alta', safety: 'Alta (Resistência a dano)', passiveWeight: true, recommended: true },
+  { id: 'armored_horse_t6', name: 'Cavalo Blindado T6 (600 kg)', maxLoadKg: 600, speed: 'Alta', safety: 'Alta (Resistência a dano)', passiveWeight: true, recommended: true },
+  { id: 'armored_horse_t7', name: 'Cavalo Blindado T7 (800 kg)', maxLoadKg: 800, speed: 'Alta', safety: 'Muito Alta', passiveWeight: true, recommended: true },
+  { id: 'armored_horse_t8', name: 'Cavalo Blindado T8 (1.050 kg)', maxLoadKg: 1050, speed: 'Muito Alta', safety: 'Máxima', passiveWeight: true, recommended: true },
+  { id: 'stag_t4', name: 'Cervo Gigante T4 (480 kg)', maxLoadKg: 480, speed: 'Muito Alta', safety: 'Média (Foco em agilidade)', passiveWeight: true, recommended: true },
+  { id: 'spectral_direboar', name: 'Javali Espectral T7 (1.100 kg)', maxLoadKg: 1100, speed: 'Muito Alta', safety: 'Extrema (Invisibilidade ativa)', passiveWeight: true, recommended: true },
+  { id: 'grizzly_bear', name: 'Urso Cinzento T7 (2.100 kg)', maxLoadKg: 2100, speed: 'Média-Rápida', safety: 'Extrema (Habilidade Anti-Slow)', passiveWeight: true, recommended: true },
+  { id: 'swamp_salamander', name: 'Salamandra do Pântano T7 (650 kg)', maxLoadKg: 650, speed: 'Constante', safety: 'Alta (100% velocidade em combate)', passiveWeight: true, recommended: true },
+  { id: 'ox_t4', name: 'Boi de Transporte T4 (1.000 kg)', maxLoadKg: 1000, speed: 'Lenta', safety: 'Baixa (Perigo fatal se desmontar)', passiveWeight: false, recommended: false },
+  { id: 'ox_t5', name: 'Boi de Transporte T5 (1.600 kg)', maxLoadKg: 1600, speed: 'Lenta', safety: 'Baixa (Perigo fatal se desmontar)', passiveWeight: false, recommended: false },
+  { id: 'ox_t6', name: 'Boi de Transporte T6 (2.400 kg)', maxLoadKg: 2400, speed: 'Lenta', safety: 'Baixa (Perigo fatal se desmontar)', passiveWeight: false, recommended: false },
+  { id: 'ox_t7', name: 'Boi de Transporte T7 (3.500 kg)', maxLoadKg: 3500, speed: 'Lenta', safety: 'Baixa (Perigo fatal se desmontar)', passiveWeight: false, recommended: false },
+  { id: 'ox_t8', name: 'Boi de Transporte T8 (5.200 kg)', maxLoadKg: 5200, speed: 'Lenta', safety: 'Baixa (Perigo fatal se desmontar)', passiveWeight: false, recommended: false }
 ];
 
 // Gera a lista expandida de IDs do Albion (ex: T4_BAG, T5_BAG, T4_MAIN_1H_SWORD@1)
