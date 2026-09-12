@@ -13,6 +13,7 @@ export function createMarketCalculatorView(container, state, onAddToCart) {
   let selectedTier = 'all';
   let selectedEnch = 'all';
   let sortBy = 'totalProfit'; // 'totalProfit' | 'unitProfit' | 'roi' | 'buyPrice' | 'freshness'
+  let projectionStrategy = 'single'; // 'single' | 'basket'
 
   async function loadData(forceRefresh = false) {
     isLoading = true;
@@ -89,6 +90,74 @@ export function createMarketCalculatorView(container, state, onAddToCart) {
       );
     });
 
+    // Oportunidades lucrativas acessíveis com o saldo do usuário
+    const profitableOps = filteredOpportunities.filter(op => op.unitProfit > 0);
+    const affordableOps = profitableOps.filter(op => op.canAfford && op.totalNetProfit > 0);
+    const bestOp = affordableOps.length > 0 ? affordableOps[0] : null;
+
+    // Calcular Carteira Mista / Diversificada (Cesta de Itens)
+    // Distribui o capital em até 3 itens lucrativos distintos para não saturar o Black Market
+    const basketCandidates = [];
+    const seenBases = new Set();
+    for (const op of affordableOps) {
+      if (!seenBases.has(op.baseId)) {
+        seenBases.add(op.baseId);
+        basketCandidates.push(op);
+        if (basketCandidates.length >= 3) break;
+      }
+    }
+    if (basketCandidates.length === 0 && affordableOps.length > 0) {
+      basketCandidates.push(affordableOps[0]);
+    }
+
+    let basketItems = [];
+    let basketTotalInvestment = 0;
+    let basketTotalGrossReturn = 0;
+    let basketTotalNetReturn = 0;
+    let basketTotalNetProfit = 0;
+    let basketTotalWeightKg = 0;
+
+    if (basketCandidates.length > 0) {
+      const budgetPerItem = Math.floor(state.budget / basketCandidates.length);
+      for (const item of basketCandidates) {
+        const units = Math.floor(budgetPerItem / item.buyPrice);
+        if (units > 0) {
+          const inv = units * item.buyPrice;
+          const grossRet = units * item.sellPrice;
+          const netRet = units * item.netSellPrice;
+          const netProf = netRet - inv;
+          const weight = units * (item.unitWeight || 2.0);
+          basketItems.push({
+            ...item,
+            allocatedUnits: units,
+            allocatedInvestment: inv,
+            allocatedGrossReturn: grossRet,
+            allocatedNetReturn: netRet,
+            allocatedNetProfit: netProf,
+            allocatedWeightKg: weight
+          });
+          basketTotalInvestment += inv;
+          basketTotalGrossReturn += grossRet;
+          basketTotalNetReturn += netRet;
+          basketTotalNetProfit += netProf;
+          basketTotalWeightKg += weight;
+        }
+      }
+    }
+
+    const basketRoiPercent = basketTotalInvestment > 0 
+      ? (basketTotalNetProfit / basketTotalInvestment) * 100 
+      : 0;
+
+    // Métricas ativas conforme a estratégia de projeção selecionada
+    const isBasket = projectionStrategy === 'basket' && basketItems.length > 0;
+    const activeInvestment = isBasket ? basketTotalInvestment : (bestOp ? bestOp.totalInvestment : state.budget);
+    const activeGrossReturn = isBasket ? basketTotalGrossReturn : (bestOp ? bestOp.totalGrossReturn : 0);
+    const activeNetReturn = isBasket ? basketTotalNetReturn : (bestOp ? bestOp.totalNetReturn : 0);
+    const activeNetProfit = isBasket ? basketTotalNetProfit : (bestOp ? bestOp.totalNetProfit : 0);
+    const activeRoiPercent = isBasket ? basketRoiPercent : (bestOp ? bestOp.roiPercent : 0);
+    const activeTotalWeight = isBasket ? basketTotalWeightKg : (bestOp ? bestOp.totalWeightKg : 0);
+
     container.innerHTML = `
       <div class="market-dashboard">
         <!-- Barra de Parâmetros de Investimento -->
@@ -99,7 +168,7 @@ export function createMarketCalculatorView(container, state, onAddToCart) {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>
                 Parâmetros de Investimento & Margem
               </h2>
-              <p class="panel-sub">Defina seu capital disponível para ver o retorno exato e quantas unidades comprar</p>
+              <p class="panel-sub">Defina seu capital disponível para ver a estimativa exata de retorno e quanto de lucro você terá</p>
             </div>
             
             <button class="btn btn-primary" id="btn-refresh-prices" ${isLoading ? 'disabled' : ''}>
@@ -180,6 +249,142 @@ export function createMarketCalculatorView(container, state, onAddToCart) {
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- Estimativa Consolidada de Retorno e Lucro pelo Total Investido -->
+        <div class="investment-projection-card">
+          <div class="projection-header">
+            <div class="projection-titles">
+              <div class="projection-badge-row">
+                <span class="badge-tag">PROJEÇÃO FINANCEIRA DO SEU CAPITAL</span>
+                <span class="badge-city">${state.selectedCity} ➔ Black Market (Caerleon)</span>
+              </div>
+              <h3 class="projection-main-title">
+                Estimativa para ${formatSilver(state.budget)} Prata Investidos
+              </h3>
+              <p class="projection-sub">
+                Veja o total investido, o retorno bruto, retorno líquido já descontada a taxa do BM (${taxPercent}%) e o lucro limpo no seu bolso.
+              </p>
+            </div>
+
+            <div class="projection-strategy-toggle">
+              <button 
+                class="strategy-tab-btn ${projectionStrategy === 'single' ? 'active' : ''}" 
+                id="tab-strat-single"
+                title="Focar todo o capital no item que dá o maior lucro líquido total"
+              >
+                🎯 Foco Máximo (${bestOp ? bestOp.namePt.slice(0, 16) : 'Melhor Item'})
+              </button>
+              <button 
+                class="strategy-tab-btn ${projectionStrategy === 'basket' ? 'active' : ''}" 
+                id="tab-strat-basket"
+                title="Dividir o capital entre até 3 itens lucrativos para reduzir risco de saturação no Black Market"
+              >
+                🛡️ Carga Diversificada (${basketItems.length} tipos)
+              </button>
+            </div>
+          </div>
+
+          <div class="projection-metrics-grid">
+            <div class="proj-metric-item">
+              <span class="proj-metric-label">Total Investido (Compra)</span>
+              <div class="proj-metric-val text-silver">
+                ${formatSilver(activeInvestment)}
+              </div>
+              <span class="proj-metric-desc">
+                ${isBasket 
+                  ? `Distribuído em ${basketItems.reduce((acc, i) => acc + i.allocatedUnits, 0)} unidades de ${basketItems.length} tipos` 
+                  : (bestOp ? `Comprando ${bestOp.maxUnits}x em ${state.selectedCity}` : 'Defina seu saldo')}
+              </span>
+            </div>
+
+            <div class="proj-metric-item">
+              <span class="proj-metric-label">Retorno Bruto em Caerleon</span>
+              <div class="proj-metric-val text-gold">
+                ${formatSilver(activeGrossReturn)}
+              </div>
+              <span class="proj-metric-desc">Valor total das vendas brutas no Black Market</span>
+            </div>
+
+            <div class="proj-metric-item">
+              <span class="proj-metric-label">Retorno Líquido na Conta</span>
+              <div class="proj-metric-val text-gold">
+                ${formatSilver(activeNetReturn)}
+              </div>
+              <span class="proj-metric-desc">Já deduzida a taxa de ${taxPercent}% do BM</span>
+            </div>
+
+            <div class="proj-metric-item highlight-profit-box">
+              <span class="proj-metric-label">LUCRO LÍQUIDO NO BOLSO</span>
+              <div class="proj-metric-val text-emerald">
+                +${formatSilver(activeNetProfit)}
+              </div>
+              <span class="proj-metric-desc badge-roi-highlight">
+                +${activeRoiPercent.toFixed(1)}% de Retorno Líquido (ROI)
+              </span>
+            </div>
+          </div>
+
+          ${bestOp ? `
+            <div class="projection-strategy-details">
+              ${!isBasket ? `
+                <div class="single-strategy-callout">
+                  <div class="callout-item-preview">
+                    <img class="callout-thumb" src="${getItemIconUrl(bestOp.id, bestOp.quality)}" alt="${bestOp.namePt}" />
+                    <div class="callout-info">
+                      <div class="callout-item-title">
+                        <strong>${bestOp.namePt}</strong>
+                        <span class="tier-badge">T${bestOp.tier}${bestOp.enchantment > 0 ? '.' + bestOp.enchantment : ''}</span>
+                      </div>
+                      <div class="callout-breakdown">
+                        <span>Investimento: <strong>${formatSilver(bestOp.totalInvestment)}</strong> (${bestOp.maxUnits}x a ${formatSilver(bestOp.buyPrice)})</span>
+                        <span class="dot-sep">•</span>
+                        <span>Retorno BM: <strong>${formatSilver(bestOp.totalNetReturn)}</strong></span>
+                        <span class="dot-sep">•</span>
+                        <span>Lucro Limpo: <strong class="text-emerald">+${formatSilver(bestOp.totalNetProfit)}</strong> (+${bestOp.roiPercent.toFixed(1)}%)</span>
+                        <span class="dot-sep">•</span>
+                        <span>Peso Total: <strong>${bestOp.totalWeightKg.toFixed(1)} kg</strong></span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="callout-action-btns">
+                    <button class="btn btn-primary btn-sm" id="btn-load-best-single">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+                      Carregar no Carrinho (${bestOp.maxUnits}x)
+                    </button>
+                    <button class="btn btn-secondary btn-sm btn-copy-name" data-copy="${bestOp.namePt}">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                      Copiar Nome
+                    </button>
+                  </div>
+                </div>
+              ` : `
+                <div class="basket-strategy-callout">
+                  <div class="basket-items-list">
+                    ${basketItems.map(bItem => `
+                      <div class="basket-item-chip">
+                        <img class="chip-thumb" src="${getItemIconUrl(bItem.id, bItem.quality)}" alt="${bItem.namePt}" />
+                        <div class="chip-info">
+                          <span class="chip-name"><strong>${bItem.allocatedUnits}x</strong> ${bItem.namePt}</span>
+                          <span class="chip-meta">Investe: ${formatSilver(bItem.allocatedInvestment)} ➔ Lucro: <strong class="text-emerald">+${formatSilver(bItem.allocatedNetProfit)}</strong> (+${bItem.roiPercent.toFixed(1)}%)</span>
+                        </div>
+                      </div>
+                    `).join('')}
+                  </div>
+                  <div class="basket-action-btns">
+                    <button class="btn btn-primary btn-sm" id="btn-load-diversified-basket">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                      Carregar Cesta Completa (${basketItems.length} tipos)
+                    </button>
+                  </div>
+                </div>
+              `}
+            </div>
+          ` : `
+            <div class="projection-empty-notice">
+              <span>💡 Ajuste seu saldo de investimento ou clique em "Atualizar Cotações" para calcular a melhor estimativa de retorno e lucro.</span>
+            </div>
+          `}
         </div>
 
         <!-- Filtros Rápidos & Busca -->
@@ -313,18 +518,29 @@ export function createMarketCalculatorView(container, state, onAddToCart) {
 
                       <td class="cell-budget-calc">
                         ${op.canAfford ? `
-                          <div class="budget-units">
-                            <span class="units-count">Compre <strong>${op.maxUnits}x</strong></span>
-                            <span class="units-cost">Custo: ${formatSilver(op.totalInvestment)}</span>
-                          </div>
-                          <div class="budget-profit">
-                            <span class="total-profit-highlight">
-                              +${formatSilver(op.totalNetProfit)}
-                            </span>
-                            <span class="total-weight">Peso: ${op.totalWeightKg.toFixed(1)} kg</span>
+                          <div class="budget-calc-box">
+                            <div class="calc-row-top">
+                              <span class="units-pill">Compre <strong>${op.maxUnits}x</strong></span>
+                              <span class="calc-investment">Investe: <strong>${formatSilver(op.totalInvestment)}</strong></span>
+                            </div>
+                            <div class="calc-row-return">
+                              <span class="calc-label">Retorno Líquido:</span>
+                              <strong class="text-gold">${formatSilver(op.totalNetReturn)}</strong>
+                            </div>
+                            <div class="calc-row-profit">
+                              <span class="calc-label">Lucro Líquido:</span>
+                              <strong class="profit-highlight">+${formatSilver(op.totalNetProfit)}</strong>
+                              <span class="roi-mini">(+${op.roiPercent.toFixed(1)}%)</span>
+                            </div>
+                            <div class="calc-weight-mini">
+                              <span>⚖️ Peso: ${op.totalWeightKg.toFixed(1)} kg</span>
+                            </div>
                           </div>
                         ` : `
-                          <span class="badge-insufficient">Custa mais que o seu saldo</span>
+                          <div class="budget-calc-insufficient">
+                            <span class="badge-insufficient">Saldo Insuficiente</span>
+                            <span class="insufficient-desc">Item custa ${formatSilver(op.buyPrice)}</span>
+                          </div>
                         `}
                       </td>
 
@@ -353,14 +569,55 @@ export function createMarketCalculatorView(container, state, onAddToCart) {
       </div>
     `;
 
-    attachEvents(filteredOpportunities);
+    attachEvents(filteredOpportunities, bestOp, basketItems, basketTotalNetProfit);
   }
 
-  function attachEvents(currentOpportunities) {
+  function attachEvents(currentOpportunities, bestOp, basketItems, basketTotalNetProfit) {
     // Atualizar Cotações
     const btnRefresh = document.getElementById('btn-refresh-prices');
     if (btnRefresh) {
       btnRefresh.addEventListener('click', () => loadData(true));
+    }
+
+    // Alternar Estratégia de Projeção (Single vs Basket)
+    const btnStratSingle = document.getElementById('tab-strat-single');
+    if (btnStratSingle) {
+      btnStratSingle.addEventListener('click', () => {
+        projectionStrategy = 'single';
+        render();
+      });
+    }
+
+    const btnStratBasket = document.getElementById('tab-strat-basket');
+    if (btnStratBasket) {
+      btnStratBasket.addEventListener('click', () => {
+        projectionStrategy = 'basket';
+        render();
+      });
+    }
+
+    // Carregar Melhor Item Único no Carrinho
+    const btnLoadBestSingle = document.getElementById('btn-load-best-single');
+    if (btnLoadBestSingle && bestOp) {
+      btnLoadBestSingle.addEventListener('click', () => {
+        if (onAddToCart) {
+          onAddToCart(bestOp, bestOp.maxUnits);
+          showToast(`Carregado no Carrinho: ${bestOp.maxUnits}x ${bestOp.namePt} (Lucro estimado: +${formatSilver(bestOp.totalNetProfit)})`);
+        }
+      });
+    }
+
+    // Carregar Cesta Diversificada no Carrinho
+    const btnLoadBasket = document.getElementById('btn-load-diversified-basket');
+    if (btnLoadBasket && basketItems && basketItems.length > 0) {
+      btnLoadBasket.addEventListener('click', () => {
+        if (onAddToCart) {
+          for (const item of basketItems) {
+            onAddToCart(item, item.allocatedUnits);
+          }
+          showToast(`Cesta carregada no Carrinho! Lucro total estimado: +${formatSilver(basketTotalNetProfit)}`);
+        }
+      });
     }
 
     // Input de Orçamento
@@ -471,14 +728,14 @@ export function createMarketCalculatorView(container, state, onAddToCart) {
       });
     });
 
-    // Adicionar ao Carrinho de Transporte
+    // Adicionar ao Carrinho de Transporte (1 unidade da linha)
     document.querySelectorAll('.btn-add-cart').forEach(btn => {
       btn.addEventListener('click', () => {
         const idx = Number(btn.getAttribute('data-idx'));
         const op = currentOpportunities[idx];
         if (op && onAddToCart) {
-          onAddToCart(op);
-          showToast(`Adicionado ao Carrinho: ${op.namePt}`);
+          onAddToCart(op, 1);
+          showToast(`+1 un. de ${op.namePt} adicionada ao Carrinho!`);
         }
       });
     });

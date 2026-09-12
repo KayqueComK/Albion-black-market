@@ -110,8 +110,8 @@ function switchTab(tabId) {
   if (tabId === 'bandit') {
     activeViewInstance = createBanditView(container, appState);
   } else if (tabId === 'calculator') {
-    activeViewInstance = createMarketCalculatorView(container, appState, (opportunity) => {
-      handleAddToCart(opportunity);
+    activeViewInstance = createMarketCalculatorView(container, appState, (opportunity, qty = 1) => {
+      handleAddToCart(opportunity, qty);
     });
   } else if (tabId === 'cart') {
     activeViewInstance = createCartLoadoutView(container, appState, () => {
@@ -125,15 +125,15 @@ function switchTab(tabId) {
 /**
  * Adiciona um item ao carrinho de carga
  */
-function handleAddToCart(opportunity) {
+function handleAddToCart(opportunity, qtyToAdd = 1) {
   const existing = appState.cart.find(item => item.id === opportunity.id && item.quality === opportunity.quality);
 
   if (existing) {
-    existing.qty = (existing.qty || 1) + 1;
+    existing.qty = (existing.qty || 0) + qtyToAdd;
   } else {
     appState.cart.push({
       ...opportunity,
-      qty: 1
+      qty: qtyToAdd
     });
   }
 
