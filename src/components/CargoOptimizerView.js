@@ -1,8 +1,16 @@
 // Componente da Aba: Estimativa & Otimizador de Carga por Bolsa e Montaria
 // Calcula a combinação exata de itens e quantidades para o maior lucro líquido possível
 // respeitando estritamente o orçamento e o peso máximo (Montaria + Bolsa)
+// Inclui suporte a itens de coleta, recursos refinados, consumíveis e sugestões de alta demanda
 
-import { getExpandedItemIdsList, TRANSPORT_MOUNTS, BAGS_CATALOG, QUALITIES } from '../data/itemsCatalog.js';
+import { 
+  getExpandedItemIdsList, 
+  TRANSPORT_MOUNTS, 
+  BAGS_CATALOG, 
+  QUALITIES, 
+  ITEM_CATEGORIES, 
+  HIGH_DEMAND_RECOMMENDATIONS 
+} from '../data/itemsCatalog.js';
 import { fetchLivePrices, getItemIconUrl, formatSilver, formatDataAge, CITIES } from '../services/albionApi.js';
 import { calculateArbitrageOpportunities, calculateTaxRate } from '../services/arbitrageCalculator.js';
 import { optimizeCargoLoadout } from '../services/cargoOptimizer.js';
@@ -12,7 +20,9 @@ export function createCargoOptimizerView(container, state, onAddToCart) {
   let isLoading = false;
   let selectedMountId = state.selectedMountId || 'armored_horse_t5';
   let selectedBagId = state.selectedBagId || 'bag_t5';
-  let optimizationStrategy = 'balanced'; // 'balanced' | 'max_profit' | 'high_mobility'
+  let optimizationStrategy = 'fast_sale'; // 'fast_sale' (default) | 'balanced' | 'max_profit' | 'high_mobility'
+  let selectedCategory = 'all';
+  let onlyHighDemand = false;
 
   async function loadData(forceRefresh = false) {
     isLoading = true;
@@ -40,7 +50,8 @@ export function createCargoOptimizerView(container, state, onAddToCart) {
       hasPremium: state.hasPremium,
       sellMode: state.sellMode,
       originCity: state.selectedCity,
-      category: 'all',
+      category: selectedCategory,
+      onlyHighDemand: onlyHighDemand,
       minRoi: 0,
       minProfit: 0,
       maxDataAgeHours: 72
@@ -53,7 +64,8 @@ export function createCargoOptimizerView(container, state, onAddToCart) {
       bagId: selectedBagId,
       safetyMarginPercent: 0.05,
       maxItemDiversity: 8,
-      strategy: optimizationStrategy
+      strategy: optimizationStrategy,
+      onlyHighDemand: onlyHighDemand
     });
 
     container.innerHTML = `
@@ -68,7 +80,7 @@ export function createCargoOptimizerView(container, state, onAddToCart) {
                 Estimativa de Lucro Máximo por Equipamento
               </h2>
               <p class="panel-sub">
-                Informe quanto deseja investir, qual montaria e bolsa você está usando. O algoritmo encontra a combinação perfeita de itens e quantidades para o maior lucro líquido sem sobrecarga.
+                Informe quanto deseja investir, sua montaria e bolsa. O algoritmo calcula a combinação perfeita de itens e quantidades para o maior retorno líquido sem risco de sobrecarga.
               </p>
             </div>
 
@@ -128,8 +140,11 @@ export function createCargoOptimizerView(container, state, onAddToCart) {
 
             <!-- 3. Parâmetros de Mercado & Estratégia -->
             <div class="control-group">
-              <label class="control-label" for="opt-select-strategy">Estratégia de Otimização:</label>
+              <label class="control-label" for="opt-select-strategy">Estratégia de Carga:</label>
               <select id="opt-select-strategy" class="select-field">
+                <option value="fast_sale" ${optimizationStrategy === 'fast_sale' ? 'selected' : ''}>
+                  ⚡ Giro Rápido & Alta Demanda (Itens mais fáceis de vender)
+                </option>
                 <option value="balanced" ${optimizationStrategy === 'balanced' ? 'selected' : ''}>
                   ⚖️ Equilibrada (Divide em até 8 itens para não saturar o BM)
                 </option>
@@ -141,6 +156,15 @@ export function createCargoOptimizerView(container, state, onAddToCart) {
                 </option>
               </select>
 
+              <label class="control-label mt-2" for="opt-select-category">Filtrar Categoria:</label>
+              <select id="opt-select-category" class="select-field">
+                ${ITEM_CATEGORIES.map(c => `
+                  <option value="${c.id}" ${c.id === selectedCategory ? 'selected' : ''}>
+                    ${c.name}
+                  </option>
+                `).join('')}
+              </select>
+
               <div class="toggle-premium-box mt-2">
                 <label class="checkbox-container">
                   <input type="checkbox" id="opt-check-premium" ${state.hasPremium ? 'checked' : ''} />
@@ -149,6 +173,49 @@ export function createCargoOptimizerView(container, state, onAddToCart) {
                 </label>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- Seção de Sugestões de Alta Demanda & Venda Rápida -->
+        <div class="high-demand-showcase">
+          <div class="showcase-header">
+            <div class="showcase-titles">
+              <span class="badge-tag">MERCADO DE CAERLEON & BLACK MARKET</span>
+              <h3 class="showcase-title">🔥 Sugestões de Alta Demanda (Itens Mais Fáceis de Vender)</h3>
+              <p class="showcase-desc">
+                Estes nichos têm liquidez máxima comprovada. O Black Market recompra continuamente mob drops e os jogadores de Caerleon compram insumos e consumíveis diariamente nas Red Zones.
+              </p>
+            </div>
+            ${selectedCategory !== 'all' ? `
+              <button class="btn btn-secondary btn-sm" id="btn-reset-category-filter">
+                Ver Todas as Categorias
+              </button>
+            ` : ''}
+          </div>
+
+          <div class="showcase-cards-grid">
+            ${HIGH_DEMAND_RECOMMENDATIONS.map(sugg => {
+              const isActive = selectedCategory === sugg.targetCategory;
+              return `
+                <div class="sugg-card ${isActive ? 'active-sugg' : ''}">
+                  <div class="sugg-card-top">
+                    <span class="sugg-icon">${sugg.icon}</span>
+                    <span class="sugg-badge ${sugg.liquidityClass}">${sugg.liquidity}</span>
+                  </div>
+                  <h4 class="sugg-card-title">${sugg.categoryTitle}</h4>
+                  <p class="sugg-card-desc">${sugg.description}</p>
+                  <div class="sugg-card-meta">
+                    <span class="sugg-market-tag">${sugg.sellMarket}</span>
+                    <div class="sugg-tags">
+                      ${sugg.sampleItems.map(item => `<span class="sugg-item-pill">${item}</span>`).join('')}
+                    </div>
+                  </div>
+                  <button class="btn ${isActive ? 'btn-primary' : 'btn-secondary'} btn-sm btn-filter-sugg" data-category="${sugg.targetCategory}">
+                    ${isActive ? '✓ Categoria Ativa' : 'Focar Nesta Categoria'}
+                  </button>
+                </div>
+              `;
+            }).join('')}
           </div>
         </div>
 
@@ -217,11 +284,11 @@ export function createCargoOptimizerView(container, state, onAddToCart) {
             </div>
 
             <div class="proj-metric-item">
-              <span class="proj-metric-label">Retorno Bruto no BM</span>
+              <span class="proj-metric-label">Retorno Bruto em Caerleon</span>
               <div class="proj-metric-val text-gold">
                 ${formatSilver(plan.totalGrossReturn)}
               </div>
-              <span class="proj-metric-desc">Total arrecadado nas vendas em Caerleon</span>
+              <span class="proj-metric-desc">Total arrecadado nas vendas (BM e Mercado Real)</span>
             </div>
 
             <div class="proj-metric-item">
@@ -229,7 +296,7 @@ export function createCargoOptimizerView(container, state, onAddToCart) {
               <div class="proj-metric-val text-gold">
                 ${formatSilver(plan.totalNetReturn)}
               </div>
-              <span class="proj-metric-desc">Já deduzida a taxa de ${taxPercent}% do BM</span>
+              <span class="proj-metric-desc">Já deduzidas as taxas de mercado</span>
             </div>
 
             <div class="proj-metric-item highlight-profit-box">
@@ -269,10 +336,11 @@ export function createCargoOptimizerView(container, state, onAddToCart) {
               <thead>
                 <tr>
                   <th>Item / Qualidade</th>
+                  <th>Demanda / Destino</th>
                   <th>Quantidade a Comprar</th>
                   <th>Compra Unitária</th>
                   <th>Investimento Total</th>
-                  <th>Venda no BM</th>
+                  <th>Venda em Caerleon</th>
                   <th>Retorno Líquido</th>
                   <th>Lucro Líquido Real</th>
                   <th>Peso do Lote</th>
@@ -299,9 +367,24 @@ export function createCargoOptimizerView(container, state, onAddToCart) {
                         </div>
                       </td>
 
+                      <td class="cell-demand-destination">
+                        <div class="demand-dest-box">
+                          ${item.demandLevel === 'ultra' ? `
+                            <span class="demand-pill ultra" title="${item.demandReason}">⚡ Giro Imediato</span>
+                          ` : item.demandLevel === 'high' ? `
+                            <span class="demand-pill high" title="${item.demandReason}">🔥 Alta Demanda</span>
+                          ` : `
+                            <span class="demand-pill normal">Demanda Regular</span>
+                          `}
+                          <span class="dest-market-tag ${item.targetMarket || 'black_market'}">
+                            ${item.targetMarketBadge || '🏴 Black Market'}
+                          </span>
+                        </div>
+                      </td>
+
                       <td class="cell-qty-recommended">
                         <span class="recommended-qty-pill">
-                          <strong>${item.recommendedUnits}x</strong> unidades
+                          <strong>${item.recommendedUnits}x</strong> un.
                         </span>
                       </td>
 
@@ -412,6 +495,41 @@ export function createCargoOptimizerView(container, state, onAddToCart) {
       });
     }
 
+    // Seletor de Categoria
+    const selectCategory = document.getElementById('opt-select-category');
+    if (selectCategory) {
+      selectCategory.addEventListener('change', (e) => {
+        selectedCategory = e.target.value;
+        onlyHighDemand = selectedCategory === 'high_demand';
+        render();
+      });
+    }
+
+    // Botões dos Cards de Sugestão de Alta Demanda
+    document.querySelectorAll('.btn-filter-sugg').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const cat = btn.getAttribute('data-category');
+        if (selectedCategory === cat) {
+          selectedCategory = 'all';
+          onlyHighDemand = false;
+        } else {
+          selectedCategory = cat;
+          onlyHighDemand = false;
+        }
+        render();
+      });
+    });
+
+    // Botão Reset de Categoria
+    const btnResetCat = document.getElementById('btn-reset-category-filter');
+    if (btnResetCat) {
+      btnResetCat.addEventListener('click', () => {
+        selectedCategory = 'all';
+        onlyHighDemand = false;
+        render();
+      });
+    }
+
     // Checkbox Premium
     const checkPremium = document.getElementById('opt-check-premium');
     if (checkPremium) {
@@ -448,14 +566,15 @@ export function createCargoOptimizerView(container, state, onAddToCart) {
     const btnCopyChecklist = document.getElementById('btn-copy-optimized-checklist');
     if (btnCopyChecklist && plan && plan.recommendedItems.length > 0) {
       btnCopyChecklist.addEventListener('click', () => {
-        let text = `📦 LISTA DE CARGA OTIMIZADA (Lymhurst -> Caerleon Black Market)\n`;
+        let text = `📦 LISTA DE CARGA OTIMIZADA (Lymhurst -> Caerleon)\n`;
         text += `⚔️ Saldo Investido: ${formatSilver(plan.totalInvested)} / ${formatSilver(plan.budget)}\n`;
         text += `💰 Lucro Líquido Estimado: +${formatSilver(plan.totalNetProfit)} (+${plan.averageRoiPercent.toFixed(1)}% ROI)\n`;
         text += `⚖️ Peso da Carga: ${plan.totalWeightUsed.toFixed(1)} kg / ${plan.totalMaxLoadKg} kg (${plan.mount.name.split(' (')[0]} + ${plan.bag.name})\n`;
         text += `--------------------------------------------------\n`;
 
         plan.recommendedItems.forEach((item, i) => {
-          text += `${i + 1}. [${item.recommendedUnits}x] ${item.namePt} | Compra: ${formatSilver(item.buyPrice)} un. (Total: ${formatSilver(item.totalInvestment)}) | Lucro: +${formatSilver(item.totalNetProfit)}\n`;
+          const dest = item.targetMarketName || 'Black Market';
+          text += `${i + 1}. [${item.recommendedUnits}x] ${item.namePt} (${dest}) | Compra: ${formatSilver(item.buyPrice)} un. (Total: ${formatSilver(item.totalInvestment)}) | Lucro: +${formatSilver(item.totalNetProfit)}\n`;
         });
 
         navigator.clipboard.writeText(text).then(() => {

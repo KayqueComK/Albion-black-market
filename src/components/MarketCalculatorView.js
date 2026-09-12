@@ -53,6 +53,12 @@ export function createMarketCalculatorView(container, state, onAddToCart) {
 
   function sortOpportunities() {
     opportunities.sort((a, b) => {
+      if (sortBy === 'demand') {
+        const scoreA = a.demandLevel === 'ultra' ? 3 : a.demandLevel === 'high' ? 2 : 1;
+        const scoreB = b.demandLevel === 'ultra' ? 3 : b.demandLevel === 'high' ? 2 : 1;
+        if (scoreA !== scoreB) return scoreB - scoreA;
+        return b.totalNetProfit - a.totalNetProfit;
+      }
       if (sortBy === 'totalProfit') {
         if (a.canAfford && !b.canAfford) return -1;
         if (!a.canAfford && b.canAfford) return 1;
@@ -437,6 +443,7 @@ export function createMarketCalculatorView(container, state, onAddToCart) {
             <div class="select-inline">
               <label>Ordenar Por:</label>
               <select id="select-sort" class="select-small">
+                <option value="demand" ${sortBy === 'demand' ? 'selected' : ''}>🔥 Alta Demanda / Giro Rápido</option>
                 <option value="totalProfit" ${sortBy === 'totalProfit' ? 'selected' : ''}>Maior Lucro com Orçamento</option>
                 <option value="unitProfit" ${sortBy === 'unitProfit' ? 'selected' : ''}>Maior Lucro por Unidade</option>
                 <option value="roi" ${sortBy === 'roi' ? 'selected' : ''}>Maior Retorno (% ROI)</option>
@@ -453,7 +460,7 @@ export function createMarketCalculatorView(container, state, onAddToCart) {
             <div class="loading-state">
               <div class="spinner-large"></div>
               <h3>Consultando APIs do Albion Data Project em tempo real...</h3>
-              <p>Analisando centenas de ordens em ${state.selectedCity} e no Black Market de Caerleon...</p>
+              <p>Analisando centenas de ordens em ${state.selectedCity} e em Caerleon...</p>
             </div>
           ` : filteredOpportunities.length === 0 ? `
             <div class="empty-state">
@@ -466,7 +473,7 @@ export function createMarketCalculatorView(container, state, onAddToCart) {
                 <tr>
                   <th>Item / Qualidade</th>
                   <th>Compra (${state.selectedCity})</th>
-                  <th>Venda (${state.sellMode === 'instant' ? 'Ordem Compra BM' : 'Ordem Venda BM'})</th>
+                  <th>Venda em Caerleon</th>
                   <th>Lucro Líquido Unit.</th>
                   <th>Retorno (% ROI)</th>
                   <th class="col-budget">Com Seu Orçamento (${formatSilver(state.budget)})</th>
@@ -489,6 +496,14 @@ export function createMarketCalculatorView(container, state, onAddToCart) {
                             <span class="tier-badge">T${op.tier}${op.enchantment > 0 ? '.' + op.enchantment : ''}</span>
                             <span class="quality-badge" style="color: ${qualityObj.color}; border-color: ${qualityObj.color}44">
                               ${qualityObj.name}
+                            </span>
+                            ${op.demandLevel === 'ultra' ? `
+                              <span class="demand-pill ultra" title="${op.demandReason}">⚡ Giro Imediato</span>
+                            ` : op.demandLevel === 'high' ? `
+                              <span class="demand-pill high" title="${op.demandReason}">🔥 Alta Demanda</span>
+                            ` : ''}
+                            <span class="dest-market-tag ${op.targetMarket || 'black_market'}">
+                              ${op.targetMarketBadge || '🏴 Black Market'}
                             </span>
                           </div>
                         </div>

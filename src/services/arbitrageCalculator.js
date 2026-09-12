@@ -29,25 +29,30 @@ export function calculateArbitrageOpportunities(rawPriceData, catalogItems, opti
     originCity = 'Lymhurst',
     minRoi = 0,
     minProfit = 0,
-    maxDataAgeHours = 48,
+    maxDataAgeHours = 72,
     category = 'all',
+    onlyHighDemand = false,
     minTier = 4,
     maxTier = 8
   } = options;
 
   const taxRate = calculateTaxRate(hasPremium, sellMode);
 
-  // Mapear preços da cidade de origem e do Black Market
+  // Mapear preços da cidade de origem, Black Market e Caerleon Royal Market
   // Chave: `${item_id}_${quality}`
   const originPrices = new Map();
   const bmPrices = new Map();
+  const caerleonPrices = new Map();
 
   for (const row of rawPriceData) {
     const key = `${row.item_id}_${row.quality}`;
-    if (row.city.toLowerCase() === originCity.toLowerCase()) {
+    const cityLower = (row.city || '').toLowerCase();
+    if (cityLower === originCity.toLowerCase()) {
       originPrices.set(key, row);
-    } else if (row.city.toLowerCase() === 'black market') {
+    } else if (cityLower === 'black market') {
       bmPrices.set(key, row);
+    } else if (cityLower === 'caerleon') {
+      caerleonPrices.set(key, row);
     }
   }
 
@@ -55,7 +60,16 @@ export function calculateArbitrageOpportunities(rawPriceData, catalogItems, opti
 
   for (const item of catalogItems) {
     // Filtros de categoria e tier
-    if (category !== 'all' && item.category !== category) continue;
+    if (category === 'high_demand') {
+      if (item.demandLevel !== 'ultra' && item.demandLevel !== 'high') continue;
+    } else if (category !== 'all' && item.category !== category) {
+      continue;
+    }
+
+    if (onlyHighDemand && item.demandLevel !== 'ultra' && item.demandLevel !== 'high') {
+      continue;
+    }
+
     if (item.tier < minTier || item.tier > maxTier) continue;
 
     // Testar as qualidades (1 a 5)
@@ -63,27 +77,50 @@ export function calculateArbitrageOpportunities(rawPriceData, catalogItems, opti
       const key = `${item.fullId}_${quality}`;
       const originData = originPrices.get(key);
       const bmData = bmPrices.get(key);
+      const caerleonData = caerleonPrices.get(key);
 
-      if (!originData || !bmData) continue;
+      if (!originData) continue;
 
       // Preço de compra na cidade de origem: menor preço de venda disponível
       const buyPrice = originData.sell_price_min;
       if (!buyPrice || buyPrice <= 0) continue;
 
-      // Preço de venda no Black Market
-      // Se venda imediata, usamos a ordem de compra mais alta (buy_price_max)
-      // Se ordem de venda, usamos o menor preço de venda (sell_price_min)
-      const sellPrice = sellMode === 'instant' ? bmData.buy_price_max : bmData.sell_price_min;
-      if (!sellPrice || sellPrice <= 0) continue;
+      // Determinar o melhor mercado de destino entre Black Market e Caerleon Royal Market
+      let targetMarket = null;
+      let sellPrice = 0;
+      let targetDate = null;
+
+      const bmSellPrice = sellMode === 'instant' ? (bmData?.buy_price_max || 0) : (bmData?.sell_price_min || 0);
+      const caerleonSellPrice = sellMode === 'instant' ? (caerleonData?.buy_price_max || 0) : (caerleonData?.sell_price_min || 0);
+
+      if (bmSellPrice > 0 && caerleonSellPrice > 0) {
+        if (bmSellPrice >= caerleonSellPrice) {
+          targetMarket = 'black_market';
+          sellPrice = bmSellPrice;
+          targetDate = sellMode === 'instant' ? bmData.buy_price_max_date : bmData.sell_price_min_date;
+        } else {
+          targetMarket = 'caerleon';
+          sellPrice = caerleonSellPrice;
+          targetDate = sellMode === 'instant' ? caerleonData.buy_price_max_date : caerleonData.sell_price_min_date;
+        }
+      } else if (bmSellPrice > 0) {
+        targetMarket = 'black_market';
+        sellPrice = bmSellPrice;
+        targetDate = sellMode === 'instant' ? bmData.buy_price_max_date : bmData.sell_price_min_date;
+      } else if (caerleonSellPrice > 0) {
+        targetMarket = 'caerleon';
+        sellPrice = caerleonSellPrice;
+        targetDate = sellMode === 'instant' ? caerleonData.buy_price_max_date : caerleonData.sell_price_min_date;
+      }
+
+      if (!targetMarket || sellPrice <= 0) continue;
 
       // Verificar idade do dado (em horas)
-      const bmDate = sellMode === 'instant' ? bmData.buy_price_max_date : bmData.sell_price_min_date;
       const originDate = originData.sell_price_min_date;
-
-      const bmAgeHours = getAgeInHours(bmDate);
+      const targetAgeHours = getAgeInHours(targetDate);
       const originAgeHours = getAgeInHours(originDate);
 
-      if (bmAgeHours > maxDataAgeHours || originAgeHours > maxDataAgeHours) {
+      if (targetAgeHours > maxDataAgeHours || originAgeHours > maxDataAgeHours) {
         continue;
       }
 
@@ -95,8 +132,7 @@ export function calculateArbitrageOpportunities(rawPriceData, catalogItems, opti
       // Filtro de rentabilidade
       if (unitProfit < minProfit || roiPercent < minRoi) continue;
 
-      // Cálculo com base no orçamento do usuário:
-      // Quantas unidades o jogador consegue comprar com o seu saldo disponível
+      // Cálculo com base no orçamento do usuário
       const canAfford = budget >= buyPrice;
       const maxUnits = canAfford ? Math.floor(budget / buyPrice) : 0;
       const totalInvestment = maxUnits * buyPrice;
@@ -104,6 +140,9 @@ export function calculateArbitrageOpportunities(rawPriceData, catalogItems, opti
       const totalNetReturn = maxUnits * netSellPrice;
       const totalNetProfit = maxUnits * unitProfit;
       const totalWeightKg = maxUnits * (item.weight || 2.0);
+
+      const targetMarketName = targetMarket === 'black_market' ? 'Black Market' : 'Caerleon (Mercado Real)';
+      const targetMarketBadge = targetMarket === 'black_market' ? '🏴 Black Market' : '🏛️ Caerleon Real';
 
       opportunities.push({
         id: item.fullId,
@@ -115,6 +154,14 @@ export function calculateArbitrageOpportunities(rawPriceData, catalogItems, opti
         nameEn: item.nameEn,
         category: item.category,
         unitWeight: item.weight,
+        demandLevel: item.demandLevel || 'normal',
+        demandReason: item.demandReason || '',
+        isHighDemand: item.demandLevel === 'ultra' || item.demandLevel === 'high',
+
+        // Destino
+        targetMarket,
+        targetMarketName,
+        targetMarketBadge,
 
         // Preços
         buyPrice,
@@ -137,10 +184,10 @@ export function calculateArbitrageOpportunities(rawPriceData, catalogItems, opti
 
         // Metadados de data
         originDate,
-        bmDate,
+        targetDate,
         originAgeHours,
-        bmAgeHours,
-        freshestAgeHours: Math.max(originAgeHours, bmAgeHours)
+        targetAgeHours,
+        freshestAgeHours: Math.max(originAgeHours, targetAgeHours)
       });
     }
   }

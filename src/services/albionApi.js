@@ -37,24 +37,21 @@ export async function fetchLivePrices(itemIds, originCity = 'Lymhurst', serverId
   if (!itemIds || itemIds.length === 0) return [];
 
   const server = SERVERS.find(s => s.id === serverId) || SERVERS[0];
-  const locations = `${originCity},Black Market`;
+  const locations = `${originCity},Black Market,Caerleon`;
 
-  // Divide os itens em lotes menores para não estourar limite de URL (máx ~50 itens por chamada)
+  // Divide os itens em lotes menores para não estourar limite de URL (máx ~45 itens por chamada)
   const BATCH_SIZE = 45;
   const batches = [];
   for (let i = 0; i < itemIds.length; i += BATCH_SIZE) {
     batches.push(itemIds.slice(i, i + BATCH_SIZE));
   }
 
-  const results = [];
-
-  for (const batch of batches) {
+  const batchPromises = batches.map(async (batch) => {
     const cacheKey = `${server.id}_${originCity}_${batch.join(',')}`;
     const cached = cache.get(cacheKey);
 
     if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
-      results.push(...cached.data);
-      continue;
+      return cached.data;
     }
 
     const url = `${server.baseUrl}/api/v2/stats/prices/${batch.join(',')}.json?locations=${encodeURIComponent(locations)}`;
@@ -66,18 +63,20 @@ export async function fetchLivePrices(itemIds, originCity = 'Lymhurst', serverId
 
       if (!response.ok) {
         console.warn(`[Albion API] Falha na requisição: status ${response.status}`);
-        continue;
+        return [];
       }
 
       const data = await response.json();
       cache.set(cacheKey, { timestamp: Date.now(), data });
-      results.push(...data);
+      return data;
     } catch (err) {
       console.error('[Albion API Error]', err);
+      return [];
     }
-  }
+  });
 
-  return results;
+  const batchResults = await Promise.all(batchPromises);
+  return batchResults.flat();
 }
 
 /**

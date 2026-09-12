@@ -18,7 +18,8 @@ export function optimizeCargoLoadout(opportunities, config = {}) {
     bagId = 'bag_t5',
     safetyMarginPercent = 0.05, // 5% de margem de folga para não correr risco de lentidão
     maxItemDiversity = 8,       // Máximo de itens diferentes para manter a compra ágil
-    strategy = 'balanced'       // 'balanced' | 'max_profit' | 'high_mobility'
+    strategy = 'balanced',      // 'balanced' | 'fast_sale' | 'max_profit' | 'high_mobility'
+    onlyHighDemand = false
   } = config;
 
   const mount = TRANSPORT_MOUNTS.find(m => m.id === mountId) || TRANSPORT_MOUNTS[0];
@@ -30,7 +31,10 @@ export function optimizeCargoLoadout(opportunities, config = {}) {
 
   // Filtrar itens lucrativos e válidos
   const candidates = opportunities
-    .filter(op => op.unitProfit > 0 && op.buyPrice > 0 && op.buyPrice <= budget && (op.unitWeight || 2.0) <= targetMaxWeightKg)
+    .filter(op => {
+      if (onlyHighDemand && !op.isHighDemand) return false;
+      return op.unitProfit > 0 && op.buyPrice > 0 && op.buyPrice <= budget && (op.unitWeight || 2.0) <= targetMaxWeightKg;
+    })
     .map(op => {
       const weight = op.unitWeight || 2.0;
       const profitPerKg = op.unitProfit / weight;
@@ -40,7 +44,19 @@ export function optimizeCargoLoadout(opportunities, config = {}) {
       // Se a montaria tem pouca carga (ex: cavalo/cervo), valoriza mais o lucro por kg
       // Se a montaria tem carga gigante (ex: boi), valoriza mais o retorno sobre o capital (ROI)
       const weightFactor = totalMaxLoadKg < 1000 ? 0.7 : 0.4;
-      const score = (roi * (1 - weightFactor)) + (profitPerKg * weightFactor);
+      const baseScore = (roi * (1 - weightFactor)) + (profitPerKg * weightFactor);
+
+      // Multiplicador de Demanda e Liquidez (Giro Rápido no BM e Caerleon)
+      let demandMultiplier = 1.0;
+      if (op.demandLevel === 'ultra') {
+        demandMultiplier = strategy === 'fast_sale' ? 3.0 : 1.35;
+      } else if (op.demandLevel === 'high') {
+        demandMultiplier = strategy === 'fast_sale' ? 1.8 : 1.15;
+      } else {
+        demandMultiplier = strategy === 'fast_sale' ? 0.3 : 0.95;
+      }
+
+      const score = baseScore * demandMultiplier;
 
       return {
         ...op,
@@ -50,7 +66,7 @@ export function optimizeCargoLoadout(opportunities, config = {}) {
       };
     });
 
-  // Ordenar por maior eficiência
+  // Ordenar por maior eficiência e liquidez
   candidates.sort((a, b) => b.score - a.score);
 
   // Alocador Guloso com Restrição Dupla (Knapsack Bounded)
@@ -58,19 +74,21 @@ export function optimizeCargoLoadout(opportunities, config = {}) {
   let remainingWeight = targetMaxWeightKg;
   const allocatedMap = new Map(); // key = op.id + '_' + op.quality
 
-  // Limite de unidades por item dependendo da estratégia
-  // Para evitar colocar centenas de unidades de um item só e saturar o BM
-  const maxCapPerItem = strategy === 'max_profit' ? 100 : 25;
-
   // Passo 1: Distribuir unidades prioritárias
   for (const item of candidates) {
     if (allocatedMap.size >= maxItemDiversity) break;
     if (remainingBudget < item.buyPrice || remainingWeight < item.unitWeight) continue;
 
+    // Limite de unidades por item:
+    // Itens de stack leve (recursos, consumíveis) têm cap maior (150 a 300 un)
+    // Equipamentos pesados têm cap menor (15 a 40 un) para não saturar o Black Market
+    const isStackable = item.category === 'resources' || item.category === 'consumables';
+    const baseCap = isStackable ? 250 : (strategy === 'max_profit' ? 60 : 25);
+
     // Calcular quantas unidades cabem nas duas restrições simultaneamente
     const maxByBudget = Math.floor(remainingBudget / item.buyPrice);
     const maxByWeight = Math.floor(remainingWeight / item.unitWeight);
-    const possibleUnits = Math.min(maxByBudget, maxByWeight, maxCapPerItem);
+    const possibleUnits = Math.min(maxByBudget, maxByWeight, baseCap);
 
     if (possibleUnits > 0) {
       allocatedMap.set(`${item.id}_${item.quality}`, {
@@ -89,7 +107,9 @@ export function optimizeCargoLoadout(opportunities, config = {}) {
     const key = `${item.id}_${item.quality}`;
     const current = allocatedMap.get(key);
     const currentUnits = current ? current.units : 0;
-    const canAddByLimit = Math.max(0, (maxCapPerItem * 2) - currentUnits);
+    const isStackable = item.category === 'resources' || item.category === 'consumables';
+    const maxCap = isStackable ? 500 : (strategy === 'max_profit' ? 100 : 50);
+    const canAddByLimit = Math.max(0, maxCap - currentUnits);
 
     const maxByBudget = Math.floor(remainingBudget / item.buyPrice);
     const maxByWeight = Math.floor(remainingWeight / item.unitWeight);
