@@ -414,6 +414,15 @@ body {
   margin-bottom: 6px;
 }
 
+.icon-inline,
+svg.icon-inline {
+  width: 18px !important;
+  height: 18px !important;
+  max-width: 18px !important;
+  max-height: 18px !important;
+  flex-shrink: 0;
+}
+
 .status-active .advice-header {
   color: var(--color-lymhurst);
 }
