@@ -43,6 +43,12 @@
       "skillPath": ".claude/skills/ui-ux-pro-max/SKILL.md",
       "computedHash": "3f1e66e08e3d1d3feaf2a3187705022812e0bece8ff5bee80fe7cf782f26fe8b"
     },
+    "vercel-cli": {
+      "source": "vercel/vercel-plugin",
+      "sourceType": "github",
+      "skillPath": "skills/vercel-cli/SKILL.md",
+      "computedHash": "b40fa7423ca14a923437b91a59e2dd798d891e994c49821ed303ec1214b63b87"
+    },
     "video-edit": {
       "source": "prime-skills/runcomfy-agent-skills",
       "sourceType": "github",
